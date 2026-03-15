@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="theme-color" content="#0d0d1a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>MoodBar</title>
+<link rel="manifest" href="manifest.json"/>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700;800&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0d0d1a;--surface:#13131f;--card:#1a1a2e;--card2:#1e1e35;
+  --accent:#f6c90e;--accent2:#ff6b9d;--accent3:#00d4aa;
+  --text:#f0f0f8;--sub:#8888aa;--border:#2a2a45;
+  --danger:#ff4757;--success:#2ed573;
+  --font:'Prompt',sans-serif;--font2:'Sarabun',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden}
+
+/* ── Noise overlay ── */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4;pointer-events:none;z-index:0}
+
+/* ── Screens ── */
+#app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column;overflow:hidden}
+.screen.active{display:flex}
+
+/* ── Auth Screen ── */
+#auth-screen{justify-content:center;align-items:center;padding:24px;background:radial-gradient(ellipse at 50% 0%,#1a1a3e 0%,var(--bg) 70%)}
+.auth-logo{font-size:52px;margin-bottom:8px;animation:float 3s ease-in-out infinite}
+.auth-title{font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.auth-sub{color:var(--sub);font-size:13px;margin-bottom:40px;font-family:var(--font2)}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:380px}
+.auth-tabs{display:flex;background:var(--surface);border-radius:12px;padding:4px;margin-bottom:20px}
+.auth-tab{flex:1;padding:10px;text-align:center;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600;color:var(--sub);transition:.2s}
+.auth-tab.active{background:var(--accent);color:#000}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px;font-family:var(--font2)}
+.field input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;transition:.2s}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(246,201,14,.1)}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;transition:.2s;position:relative;overflow:hidden}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#f0a500);color:#000}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(246,201,14,.3)}
+.btn-primary:active{transform:translateY(0)}
+.auth-err{color:var(--danger);font-size:12px;margin-top:10px;text-align:center;font-family:var(--font2);min-height:18px}
+
+/* ── Top Bar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{font-size:22px}
+.topbar-title{font-size:17px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-user{font-size:11px;color:var(--sub);font-family:var(--font2)}
+.btn-icon{background:none;border:none;color:var(--sub);font-size:18px;cursor:pointer;padding:6px;border-radius:8px;transition:.2s}
+.btn-icon:hover{background:var(--border);color:var(--text)}
+
+/* ── Scroll Content ── */
+.scroll{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.scroll::-webkit-scrollbar{display:none}
+
+/* ── Bottom Nav ── */
+.bottom-nav{display:flex;background:var(--surface);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom);flex-shrink:0}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px;cursor:pointer;transition:.2s;border:none;background:none;color:var(--sub);font-family:var(--font);position:relative}
+.nav-item .nav-icon{font-size:22px;transition:.3s}
+.nav-item .nav-label{font-size:10px;margin-top:2px;transition:.2s}
+.nav-item.active .nav-icon{transform:translateY(-2px)}
+.nav-item.active .nav-label{color:var(--accent);font-weight:700}
+.nav-item.active::after{content:'';position:absolute;bottom:0;left:25%;right:25%;height:2px;background:var(--accent);border-radius:2px 2px 0 0}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;font-family:var(--font2)}
+
+/* ── Date Selector ── */
+.date-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.date-display{text-align:center;flex:1}
+.date-display .date-main{font-size:18px;font-weight:700}
+.date-display .date-sub{font-size:11px;color:var(--sub);font-family:var(--font2)}
+.date-nav{background:var(--card);border:1px solid var(--border);border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--sub);transition:.2s;border:none}
+.date-nav:hover{background:var(--card2);color:var(--text)}
+.today-badge{background:var(--accent);color:#000;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px;font-family:var(--font2)}
+
+/* ── Mood ── */
+.mood-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.mood-btn{display:flex;flex-direction:column;align-items:center;padding:10px 4px;border-radius:12px;border:2px solid transparent;background:var(--surface);cursor:pointer;transition:.25s;gap:4px}
+.mood-btn:hover{border-color:var(--border);transform:translateY(-2px)}
+.mood-btn.selected{transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.3)}
+.mood-emoji{font-size:28px}
+.mood-label{font-size:10px;color:var(--sub);font-family:var(--font2);font-weight:600}
+.mood-btn.selected .mood-label{font-weight:700}
+
+/* ── Note ── */
+.note-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text);font-family:var(--font2);font-size:14px;min-height:90px;resize:none;outline:none;transition:.2s;line-height:1.6}
+.note-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(246,201,14,.08)}
+
+/* ── Habits ── */
+.habit-row{display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);gap:12px;cursor:pointer;transition:.2s}
+.habit-row:last-child{border-bottom:none}
+.habit-row:hover{opacity:.85}
+.habit-check{width:24px;height:24px;border-radius:7px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.25s;font-size:13px}
+.habit-check.done{background:var(--success);border-color:var(--success);color:#000}
+.habit-name{flex:1;font-size:14px;font-family:var(--font2);transition:.2s}
+.habit-name.done{text-decoration:line-through;color:var(--sub)}
+.habit-repeat{font-size:16px;opacity:.5}
+.habit-repeat.on{opacity:1}
+.habit-del{background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:4px 8px;opacity:.5;transition:.2s}
+.habit-del:hover{opacity:1}
+.progress-wrap{margin-bottom:14px}
+.progress-info{display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;color:var(--sub);font-family:var(--font2)}
+.progress-bar{height:6px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent3),var(--accent));border-radius:4px;transition:.4s}
+.add-habit-row{display:flex;gap:8px;margin-top:12px}
+.add-habit-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:var(--font2);font-size:13px;outline:none}
+.add-habit-input:focus{border-color:var(--accent)}
+.btn-small{padding:10px 14px;background:var(--accent);color:#000;border:none;border-radius:10px;font-family:var(--font);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+
+/* ── Calendar ── */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cal-month{font-size:18px;font-weight:700}
+.day-labels{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px}
+.day-lbl{text-align:center;font-size:11px;color:var(--sub);padding:4px 0;font-family:var(--font2);font-weight:600}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;transition:.2s;position:relative;border:2px solid transparent}
+.cal-cell:hover{background:var(--card2)}
+.cal-cell.today{border-color:var(--accent)}
+.cal-cell.has-data{background:var(--card)}
+.cal-num{font-size:12px;font-weight:600}
+.cal-dot{font-size:14px;line-height:1}
+.cal-cell.today .cal-num{color:var(--accent);font-weight:800}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--sub);font-family:var(--font2)}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+
+/* ── Stats Tab ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center}
+.stat-num{font-size:28px;font-weight:800}
+.stat-label{font-size:11px;color:var(--sub);font-family:var(--font2);margin-top:2px}
+.heat-wrap{overflow-x:auto;padding-bottom:8px}
+.heat-wrap::-webkit-scrollbar{height:3px}
+.heat-wrap::-webkit-scrollbar-thumb{background:var(--border)}
+.heat-table{border-collapse:separate;border-spacing:3px}
+.heat-lbl{font-size:10px;color:var(--sub);padding-right:8px;font-family:var(--font2);white-space:nowrap}
+.heat-cell{width:28px;height:28px;border-radius:6px;background:var(--surface);position:relative;cursor:default}
+.heat-cell.done{background:rgba(46,213,115,.25)}
+.heat-cell.done::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--success)}
+.heat-day-lbl{font-size:9px;color:var(--sub);text-align:center;font-family:var(--font2)}
+
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:.25s;backdrop-filter:blur(4px)}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border-radius:24px 24px 0 0;padding:24px;padding-bottom:calc(24px + env(safe-area-inset-bottom));width:100%;max-width:480px;transform:translateY(100%);transition:.3s cubic-bezier(.34,1.56,.64,1)}
+.modal-bg.open .modal{transform:translateY(0)}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px;text-align:center}
+.modal-mood-big{font-size:56px;text-align:center;margin:8px 0 4px}
+.modal-mood-name{text-align:center;font-size:18px;font-weight:700;margin-bottom:12px}
+.modal-note-box{background:var(--card);border-radius:12px;padding:12px;font-family:var(--font2);font-size:13px;color:var(--sub);margin-bottom:12px;line-height:1.6;white-space:pre-wrap;min-height:40px}
+.modal-habits-done{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.habit-tag{background:rgba(46,213,115,.15);color:var(--success);border-radius:20px;padding:4px 10px;font-size:12px;font-family:var(--font2)}
+.modal-close{width:100%;padding:13px;background:var(--card2);border:none;border-radius:12px;color:var(--sub);font-family:var(--font);font-size:14px;cursor:pointer;margin-top:4px}
+
+/* ── Save indicator ── */
+.save-dot{width:7px;height:7px;border-radius:50%;background:var(--success);transition:.3s;opacity:0}
+.save-dot.saving{background:var(--accent);opacity:1;animation:pulse 1s infinite}
+.save-dot.saved{opacity:1;background:var(--success)}
+
+/* ── Animations ── */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .3s ease forwards}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 18px;font-size:13px;font-family:var(--font2);opacity:0;transition:.25s;pointer-events:none;z-index:200;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── AUTH SCREEN ── -->
+  <div id="auth-screen" class="screen active">
+    <div class="auth-logo">🌙</div>
+    <div class="auth-title">MoodBar</div>
+    <div class="auth-sub">บันทึกอารมณ์และนิสัยประจำวัน</div>
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchAuth('login')">เข้าสู่ระบบ</div>
+        <div class="auth-tab" onclick="switchAuth('register')">สมัครสมาชิก</div>
+      </div>
+      <div id="auth-login">
+        <div class="field"><label>อีเมล</label><input id="login-email" type="email" placeholder="your@email.com" autocomplete="email"/></div>
+        <div class="field"><label>รหัสผ่าน</label><input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+        <button class="btn btn-primary" onclick="doLogin()">เข้าสู่ระบบ</button>
+      </div>
+      <div id="auth-register" style="display:none">
+        <div class="field"><label>ชื่อที่ใช้แสดง</label><input id="reg-name" type="text" placeholder="เช่น Fairus"/></div>
+        <div class="field"><label>อีเมล</label><input id="reg-email" type="email" placeholder="your@email.com" autocomplete="email"/></div>
+        <div class="field"><label>รหัสผ่าน</label><input id="reg-pass" type="password" placeholder="อย่างน้อย 6 ตัว" autocomplete="new-password"/></div>
+        <button class="btn btn-primary" onclick="doRegister()">สมัครสมาชิก</button>
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+    </div>
+  </div>
+
+  <!-- ── MAIN SCREEN ── -->
+  <div id="main-screen" class="screen">
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-logo">🌙</span>
+        <div>
+          <div class="topbar-title">MoodBar</div>
+          <div class="topbar-user" id="topbar-user"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="save-dot" id="save-dot"></div>
+        <button class="btn-icon" onclick="doLogout()" title="ออกจากระบบ">⏻</button>
+      </div>
+    </div>
+
+    <!-- HOME TAB -->
+    <div id="tab-home" class="scroll" style="display:flex;flex-direction:column">
+      <!-- Date bar -->
+      <div class="date-bar" style="margin-top:4px">
+        <button class="date-nav" onclick="changeDay(-1)">‹</button>
+        <div class="date-display">
+          <div class="date-main" id="date-main"></div>
+          <div class="date-sub" id="date-sub"></div>
+        </div>
+        <button class="date-nav" onclick="changeDay(1)">›</button>
+      </div>
+
+      <!-- Mood -->
+      <div class="card fade-in">
+        <div class="card-title">อารมณ์วันนี้</div>
+        <div class="mood-grid" id="mood-grid"></div>
+      </div>
+
+      <!-- Note -->
+      <div class="card fade-in" style="animation-delay:.05s">
+        <div class="card-title">📝 บันทึก</div>
+        <textarea class="note-input" id="note-input" placeholder="เขียนสิ่งที่เกิดขึ้น ความรู้สึก หรือสิ่งที่อยากจำ..." rows="4"></textarea>
+      </div>
+
+      <!-- Habits -->
+      <div class="card fade-in" style="animation-delay:.1s;margin-bottom:20px">
+        <div class="card-title">✅ นิสัยประจำวัน</div>
+        <div class="progress-wrap">
+          <div class="progress-info">
+            <span id="habit-progress-text">0/0 เสร็จแล้ว</span>
+            <span id="habit-pct">0%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+        </div>
+        <div id="habit-list"></div>
+        <div class="add-habit-row">
+          <input class="add-habit-input" id="new-habit-input" placeholder="เพิ่มนิสัยใหม่..." maxlength="40"
+            onkeydown="if(event.key==='Enter')addHabit()"/>
+          <button class="btn-small" onclick="addHabit()">+ เพิ่ม</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR TAB -->
+    <div id="tab-calendar" class="scroll" style="display:none;flex-direction:column">
+      <div style="margin-top:4px">
+        <div class="cal-nav">
+          <button class="date-nav" onclick="changeCalMonth(-1)">‹</button>
+          <span class="cal-month" id="cal-month-label"></span>
+          <button class="date-nav" onclick="changeCalMonth(1)">›</button>
+        </div>
+        <div class="day-labels">
+          <div class="day-lbl">อา</div><div class="day-lbl">จ</div><div class="day-lbl">อ</div>
+          <div class="day-lbl">พ</div><div class="day-lbl">พฤ</div><div class="day-lbl">ศ</div><div class="day-lbl">ส</div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-title">สีอารมณ์</div>
+          <div class="legend" id="legend"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS TAB -->
+    <div id="tab-stats" class="scroll" style="display:none;flex-direction:column">
+      <div style="margin-top:4px">
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-num" id="stat-streak" style="color:var(--accent)">0</div><div class="stat-label">วัน Streak 🔥</div></div>
+          <div class="stat-card"><div class="stat-num" id="stat-total" style="color:var(--accent2)">0</div><div class="stat-label">วันที่บันทึก</div></div>
+          <div class="stat-card"><div class="stat-num" id="stat-habit-rate" style="color:var(--accent3)">0%</div><div class="stat-label">อัตรา Habit</div></div>
+          <div class="stat-card"><div class="stat-num" id="stat-mood-avg" style="color:var(--accent)">-</div><div class="stat-label">อารมณ์เฉลี่ย</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 Habit 14 วันล่าสุด</div>
+          <div class="heat-wrap">
+            <table class="heat-table" id="heat-table"></table>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title">😊 อารมณ์ 7 วัน</div>
+          <div id="mood-chart" style="display:flex;align-items:flex-end;gap:6px;height:80px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <div class="bottom-nav">
+      <button class="nav-item active" onclick="switchTab('home',this)">
+        <span class="nav-icon">🏠</span><span class="nav-label">หน้าหลัก</span>
+      </button>
+      <button class="nav-item" onclick="switchTab('calendar',this)">
+        <span class="nav-icon">📅</span><span class="nav-label">ปฏิทิน</span>
+      </button>
+      <button class="nav-item" onclick="switchTab('stats',this)">
+        <span class="nav-icon">📊</span><span class="nav-label">สถิติ</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Day detail modal -->
+<div class="modal-bg" id="day-modal" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-date-label"></div>
+    <div id="modal-content"></div>
+    <button class="modal-close" onclick="closeModal()">ปิด</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Firebase -->
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged,updateProfile}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getDatabase,ref,set,get,onValue,off}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig={
+  apiKey:"AIzaSyBuxR4sSzJtmruHlBLn79ax40WPMdB2HLM",
+  authDomain:"todoyus.firebaseapp.com",
+  databaseURL:"https://todoyus-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"todoyus",
+  storageBucket:"todoyus.firebasestorage.app",
+  messagingSenderId:"481521866114",
+  appId:"1:481521866114:web:04f5e1dad14a1069c2eb9b"
+};
+
+const fbApp=initializeApp(firebaseConfig);
+const auth=getAuth(fbApp);
+const db=getDatabase(fbApp);
+
+// ── State ──
+const MOODS=[
+  {id:1,emoji:"😄",label:"ดีมาก",color:"#FFD93D"},
+  {id:2,emoji:"🙂",label:"ดี",color:"#6BCB77"},
+  {id:3,emoji:"😐",label:"ปกติ",color:"#4D96FF"},
+  {id:4,emoji:"😔",label:"แย่",color:"#FF6B6B"},
+  {id:5,emoji:"😞",label:"แย่มาก",color:"#C77DFF"},
+];
+let uid=null,userLogs={},userHabits=[],activeDay=dateKey(new Date()),calDate=new Date(),saveTimer=null,dbRef=null;
+
+function dateKey(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function todayKey(){return dateKey(new Date())}
+function parseKey(k){const[y,m,d]=k.split('-');return new Date(+y,+m-1,+d)}
+function thDate(d){return d.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+function thMonth(y,m){const names=["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];return`${names[m]} ${y+543}`}
+
+// ── Auth ──
+window.switchAuth=function(mode){
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(mode==='login'?i===0:i===1)));
+  document.getElementById('auth-login').style.display=mode==='login'?'block':'none';
+  document.getElementById('auth-register').style.display=mode==='register'?'block':'none';
+  document.getElementById('auth-err').textContent='';
+}
+window.doLogin=async function(){
+  const e=document.getElementById('login-email').value.trim();
+  const p=document.getElementById('login-pass').value;
+  try{await signInWithEmailAndPassword(auth,e,p)}
+  catch(err){document.getElementById('auth-err').textContent=thAuthErr(err.code)}
+}
+window.doRegister=async function(){
+  const name=document.getElementById('reg-name').value.trim();
+  const e=document.getElementById('reg-email').value.trim();
+  const p=document.getElementById('reg-pass').value;
+  if(!name){document.getElementById('auth-err').textContent='กรุณาใส่ชื่อ';return}
+  try{
+    const cred=await createUserWithEmailAndPassword(auth,e,p);
+    await updateProfile(cred.user,{displayName:name});
+    // seed default habits
+    await set(ref(db,`users/${cred.user.uid}/habits`),["ออกกำลังกาย","อ่านหนังสือ","ดื่มน้ำ 8 แก้ว","นอนก่อน 23:00"]);
+  }catch(err){document.getElementById('auth-err').textContent=thAuthErr(err.code)}
+}
+window.doLogout=async function(){
+  if(dbRef)off(dbRef);
+  await signOut(auth);
+}
+function thAuthErr(code){
+  if(code==='auth/user-not-found'||code==='auth/invalid-credential')return'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+  if(code==='auth/wrong-password')return'รหัสผ่านไม่ถูกต้อง';
+  if(code==='auth/email-already-in-use')return'อีเมลนี้ถูกใช้แล้ว';
+  if(code==='auth/weak-password')return'รหัสผ่านต้องอย่างน้อย 6 ตัว';
+  if(code==='auth/invalid-email')return'รูปแบบอีเมลไม่ถูกต้อง';
+  return'เกิดข้อผิดพลาด กรุณาลองใหม่';
+}
+
+// ── Auth state ──
+onAuthStateChanged(auth,user=>{
+  if(user){
+    uid=user.uid;
+    document.getElementById('topbar-user').textContent=user.displayName||user.email;
+    document.getElementById('auth-screen').classList.remove('active');
+    document.getElementById('main-screen').classList.add('active');
+    loadData();
+  }else{
+    uid=null;userLogs={};userHabits=[];
+    document.getElementById('main-screen').classList.remove('active');
+    document.getElementById('auth-screen').classList.add('active');
+  }
+});
+
+// ── DB ──
+function loadData(){
+  if(dbRef)off(dbRef);
+  dbRef=ref(db,`users/${uid}`);
+  onValue(dbRef,snap=>{
+    const data=snap.val()||{};
+    userLogs=data.logs||{};
+    userHabits=data.habits||[];
+    renderAll();
+  });
+}
+function saveData(){
+  const dot=document.getElementById('save-dot');
+  dot.className='save-dot saving';
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    await set(ref(db,`users/${uid}`),{logs:userLogs,habits:userHabits});
+    dot.className='save-dot saved';
+    setTimeout(()=>dot.className='save-dot',2000);
+  },600);
+}
+function getLog(key){return userLogs[key]||{mood:null,note:'',habits:{}}}
+function setLog(key,patch){
+  userLogs[key]={...getLog(key),...patch};
+  saveData();
+}
+
+// ── Render all ──
+function renderAll(){
+  renderDateBar();renderMoodGrid();renderNoteInput();renderHabitList();
+  if(document.getElementById('tab-calendar').style.display!=='none')renderCalendar();
+  if(document.getElementById('tab-stats').style.display!=='none')renderStats();
+}
+
+// ── Date bar ──
+function renderDateBar(){
+  const d=parseKey(activeDay);
+  const isToday=activeDay===todayKey();
+  document.getElementById('date-main').innerHTML=
+    `${d.getDate()} ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][d.getMonth()]} ${d.getFullYear()+543}`+
+    (isToday?'<span class="today-badge">วันนี้</span>':'');
+  document.getElementById('date-sub').textContent=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][d.getDay()];
+}
+window.changeDay=function(n){
+  const d=parseKey(activeDay);d.setDate(d.getDate()+n);
+  activeDay=dateKey(d);renderAll();
+}
+
+// ── Mood ──
+function renderMoodGrid(){
+  const log=getLog(activeDay);
+  const g=document.getElementById('mood-grid');
+  g.innerHTML=MOODS.map(m=>`
+    <button class="mood-btn${log.mood&&log.mood.id===m.id?' selected':''}"
+      style="${log.mood&&log.mood.id===m.id?`border-color:${m.color};background:${m.color}18`:''}"
+      onclick="selectMood(${m.id})">
+      <span class="mood-emoji">${m.emoji}</span>
+      <span class="mood-label" style="${log.mood&&log.mood.id===m.id?`color:${m.color}`:''}">${m.label}</span>
+    </button>`).join('');
+}
+window.selectMood=function(id){
+  const m=MOODS.find(x=>x.id===id);
+  setLog(activeDay,{mood:m});renderMoodGrid();
+}
+
+// ── Note ──
+function renderNoteInput(){
+  const inp=document.getElementById('note-input');
+  if(document.activeElement!==inp)inp.value=getLog(activeDay).note||'';
+}
+document.getElementById('note-input').addEventListener('input',function(){
+  clearTimeout(this._t);this._t=setTimeout(()=>{setLog(activeDay,{note:this.value})},500);
+});
+
+// ── Habits ──
+function renderHabitList(){
+  const log=getLog(activeDay);
+  const done=userHabits.filter(h=>log.habits&&log.habits[h]).length;
+  const total=userHabits.length;
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById('habit-progress-text').textContent=`${done}/${total} เสร็จแล้ว`;
+  document.getElementById('habit-pct').textContent=`${pct}%`;
+  document.getElementById('progress-fill').style.width=pct+'%';
+  const list=document.getElementById('habit-list');
+  list.innerHTML=userHabits.map((h,i)=>{
+    const isDone=!!(log.habits&&log.habits[h]);
+    const isRepeat=!!(log.habits&&log.habits['__repeat_'+h]);
+    return`<div class="habit-row" onclick="toggleHabit('${h.replace(/'/g,"\\'")}')">
+      <div class="habit-check${isDone?' done'}">${isDone?'✓':''}</div>
+      <span class="habit-name${isDone?' done'}">${h}</span>
+      <span class="habit-repeat${isRepeat?' on'}" title="ทำซ้ำทุกวัน" onclick="event.stopPropagation();toggleRepeat('${h.replace(/'/g,"\\'")}')">🔁</span>
+      <button class="habit-del" onclick="event.stopPropagation();deleteHabit(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+window.toggleHabit=function(h){
+  const log=getLog(activeDay);
+  const habits={...log.habits||{}};
+  habits[h]=!habits[h];
+  // if repeat on, propagate to other days
+  if(habits['__repeat_'+h]){
+    const keys=Object.keys(userLogs);
+    keys.forEach(k=>{if(k!==activeDay){userLogs[k]={...getLog(k),habits:{...getLog(k).habits,[h]:habits[h]}}}});
+  }
+  setLog(activeDay,{habits});renderHabitList();
+}
+window.toggleRepeat=function(h){
+  const log=getLog(activeDay);
+  const habits={...log.habits||{}};
+  const key='__repeat_'+h;
+  habits[key]=!habits[key];
+  setLog(activeDay,{habits});renderHabitList();
+  showToast(habits[key]?`🔁 "${h}" จะติ๊กทุกวัน`:`⏹ ยกเลิกทำซ้ำ "${h}"`);
+}
+window.addHabit=function(){
+  const inp=document.getElementById('new-habit-input');
+  const val=inp.value.trim();
+  if(!val||userHabits.includes(val))return;
+  userHabits=[...userHabits,val];
+  inp.value='';
+  saveData();renderHabitList();
+}
+window.deleteHabit=function(i){
+  userHabits=userHabits.filter((_,j)=>j!==i);
+  saveData();renderHabitList();
+}
+
+// ── Calendar ──
+function renderCalendar(){
+  const y=calDate.getFullYear(),m=calDate.getMonth();
+  document.getElementById('cal-month-label').textContent=thMonth(y,m);
+  const firstDay=new Date(y,m,1).getDay();
+  const days=new Date(y,m+1,0).getDate();
+  const cells=Array(firstDay).fill(null).concat(Array.from({length:days},(_,i)=>i+1));
+  const today=todayKey();
+  const g=document.getElementById('cal-grid');
+  g.innerHTML=cells.map((day,i)=>{
+    if(!day)return`<div></div>`;
+    const k=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const log=userLogs[k];
+    const isToday=k===today;
+    const mood=log&&log.mood;
+    return`<div class="cal-cell${isToday?' today':''}${log?' has-data':''}"
+      style="${mood?`background:${mood.color}20`:''}"
+      onclick="openDayModal('${k}')">
+      <span class="cal-num">${day}</span>
+      ${mood?`<span class="cal-dot">${mood.emoji}</span>`:''}
+    </div>`;
+  }).join('');
+  const leg=document.getElementById('legend');
+  leg.innerHTML=MOODS.map(m=>`<div class="legend-item"><div class="legend-dot" style="background:${m.color}"></div>${m.emoji} ${m.label}</div>`).join('');
+}
+window.changeCalMonth=function(n){calDate=new Date(calDate.getFullYear(),calDate.getMonth()+n,1);renderCalendar()}
+
+// ── Stats ──
+function renderStats(){
+  const allKeys=Object.keys(userLogs).filter(k=>userLogs[k]&&userLogs[k].mood).sort();
+  document.getElementById('stat-total').textContent=allKeys.length;
+  // streak
+  let streak=0,d=new Date();
+  while(true){const k=dateKey(d);if(userLogs[k]&&userLogs[k].mood){streak++;d.setDate(d.getDate()-1)}else break;}
+  document.getElementById('stat-streak').textContent=streak;
+  // habit rate (last 7 days)
+  let hDone=0,hTotal=0;
+  for(let i=0;i<7;i++){const dd=new Date();dd.setDate(dd.getDate()-i);const k=dateKey(dd);const log=getLog(k);userHabits.forEach(h=>{hTotal++;if(log.habits&&log.habits[h])hDone++})}
+  document.getElementById('stat-habit-rate').textContent=hTotal?Math.round(hDone/hTotal*100)+'%':'0%';
+  // avg mood (last 7)
+  const moodVals=[];for(let i=0;i<7;i++){const dd=new Date();dd.setDate(dd.getDate()-i);const log=getLog(dateKey(dd));if(log.mood)moodVals.push(log.mood.id)}
+  const avg=moodVals.length?MOODS.find(m=>m.id===Math.round(moodVals.reduce((a,b)=>a+b,0)/moodVals.length)):null;
+  document.getElementById('stat-mood-avg').textContent=avg?avg.emoji:'-';
+  // heatmap 14 days
+  const days14=Array.from({length:14},(_,i)=>{const dd=new Date();dd.setDate(dd.getDate()-(13-i));return{key:dateKey(dd),date:dd}});
+  const tbl=document.getElementById('heat-table');
+  tbl.innerHTML=userHabits.map(h=>`
+    <tr><td class="heat-lbl">${h.length>8?h.slice(0,8)+'\u2026':h}</td>
+    ${days14.map(({key})=>{const hlog=getLog(key);const done=hlog.habits&&hlog.habits[h];return`<td class="heat-cell${done?' done':''}"></td>`}).join('')}</tr>
+    <tr><td></td>${days14.map(({date},i)=>i===0||i===6||i===13?`<td class="heat-day-lbl">${date.getDate()}</td>`:'<td></td>').join('')}</tr>
+  `).join('');
+  // mood chart 7 days
+  const chart=document.getElementById('mood-chart');
+  const days7=Array.from({length:7},(_,i)=>{const dd=new Date();dd.setDate(dd.getDate()-(6-i));return{key:dateKey(dd),date:dd}});
+  chart.innerHTML=days7.map(({key,date})=>{
+    const log=getLog(key);const m=log.mood;
+    const h=m?(6-m.id)*18+10:4;
+    return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:${m?'18':'12'}px;opacity:${m?1:.3}">${m?m.emoji:'·'}</div>
+      <div style="width:100%;height:${h}px;background:${m?m.color+'60':'var(--border)'};border-radius:4px;transition:.4s"></div>
+      <div style="font-size:9px;color:var(--sub)">${['อา','จ','อ','พ','พฤ','ศ','ส'][date.getDay()]}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Day modal ──
+window.openDayModal=function(key){
+  const log=userLogs[key];
+  const d=parseKey(key);
+  document.getElementById('modal-date-label').textContent=thDate(d);
+  const c=document.getElementById('modal-content');
+  if(!log||(!log.mood&&!log.note)){
+    c.innerHTML=`<div style="text-align:center;color:var(--sub);padding:20px;font-family:var(--font2)">ยังไม่มีข้อมูลวันนี้</div>`;
+  }else{
+    const doneH=userHabits.filter(h=>log.habits&&log.habits[h]);
+    c.innerHTML=`
+      ${log.mood?`<div class="modal-mood-big">${log.mood.emoji}</div>
+        <div class="modal-mood-name" style="color:${log.mood.color}">${log.mood.label}</div>`:''}
+      ${log.note?`<div class="modal-note-box">${log.note}</div>`:''}
+      ${doneH.length?`<div style="font-size:12px;color:var(--sub);margin-bottom:6px;font-family:var(--font2)">นิสัยที่ทำสำเร็จ</div>
+        <div class="modal-habits-done">${doneH.map(h=>`<span class="habit-tag">✅ ${h}</span>`).join('')}</div>`:''}
+    `;
+  }
+  document.getElementById('day-modal').classList.add('open');
+}
+window.closeModal=function(){document.getElementById('day-modal').classList.remove('open')}
+
+// ── Tab switch ──
+window.switchTab=function(name,el){
+  ['home','calendar','stats'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display=t===name?'flex':'none';
+  });
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  if(name==='calendar')renderCalendar();
+  if(name==='stats')renderStats();
+}
+
+// ── Toast ──
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+window.showToast=showToast;
+</script>
+</body>
+</html>
